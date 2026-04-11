@@ -1,20 +1,31 @@
 package com.example.memoryroute
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
+import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+
+        val gameView = findViewById<GameView>(R.id.gameView)
+
+        findViewById<ImageButton>(R.id.btnUp).setOnClickListener {
+            gameView.moveUp()
+        }
+
+        findViewById<ImageButton>(R.id.btnDown).setOnClickListener {
+            gameView.moveDown()
+        }
+
+        findViewById<ImageButton>(R.id.btnLeft).setOnClickListener {
+            gameView.moveLeft()
+        }
+
+        findViewById<ImageButton>(R.id.btnRight).setOnClickListener {
+            gameView.moveRight()
         }
     }
 }
