@@ -15,6 +15,27 @@ class GameView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
+    data class Stage(
+        val moveLimit: Int
+    )
+
+    private val stages = listOf(
+        Stage(4),
+        Stage(5),
+        Stage(7)
+    )
+
+    private var stageIndex = 0
+
+    private var currentStage = stages[stageIndex]
+
+    enum class Direction {
+        UP,
+        DOWN,
+        LEFT,
+        RIGHT
+    }
+
     private val background =
         BitmapFactory.decodeResource(resources, R.drawable.city1)
 
@@ -23,6 +44,21 @@ class GameView @JvmOverloads constructor(
 
     private val runBitmap =
         BitmapFactory.decodeResource(resources, R.drawable.run)
+
+    private val emptySlotBitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.empty_slot)
+
+    private val upIconBitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.up)
+
+    private val downIconBitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.down)
+
+    private val leftIconBitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.left)
+
+    private val rightIconBitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.right)
 
     private val paint = Paint().apply {
         isFilterBitmap = false
@@ -51,6 +87,8 @@ class GameView @JvmOverloads constructor(
 
     private val frameDelay = 120L
 
+    private val moveHistory = mutableListOf<Direction>()
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -60,6 +98,8 @@ class GameView @JvmOverloads constructor(
         updateAnimation()
 
         drawPlayer(canvas)
+
+        drawMoveSlots(canvas)
 
         invalidate()
     }
@@ -87,6 +127,7 @@ class GameView @JvmOverloads constructor(
         val speed = 8f
 
         if (playerX < targetX) {
+
             playerX += speed
 
             if (playerX >= targetX) {
@@ -95,6 +136,7 @@ class GameView @JvmOverloads constructor(
         }
 
         if (playerX > targetX) {
+
             playerX -= speed
 
             if (playerX <= targetX) {
@@ -103,6 +145,7 @@ class GameView @JvmOverloads constructor(
         }
 
         if (playerY < targetY) {
+
             playerY += speed
 
             if (playerY >= targetY) {
@@ -111,6 +154,7 @@ class GameView @JvmOverloads constructor(
         }
 
         if (playerY > targetY) {
+
             playerY -= speed
 
             if (playerY <= targetY) {
@@ -119,7 +163,9 @@ class GameView @JvmOverloads constructor(
         }
 
         if (playerX == targetX && playerY == targetY) {
+
             isMoving = false
+
             state = State.IDLE
         }
     }
@@ -176,8 +222,8 @@ class GameView @JvmOverloads constructor(
             canvas.scale(
                 -1f,
                 1f,
-                playerX + 48f,
-                playerY + 48f
+                playerX + 75f,
+                playerY + 75f
             )
 
             canvas.drawBitmap(bitmap, src, dst, paint)
@@ -186,15 +232,80 @@ class GameView @JvmOverloads constructor(
         }
     }
 
+    private fun drawMoveSlots(canvas: Canvas) {
+
+        val slotSize = 120f
+
+        val totalWidth =
+            currentStage.moveLimit * slotSize
+
+        val startX =
+            (width - totalWidth) / 2f
+
+        val y = 40f
+
+        for (i in 0 until currentStage.moveLimit) {
+
+            val left = startX + i * slotSize
+
+            val dst = RectF(
+                left,
+                y,
+                left + 110f,
+                y + 110f
+            )
+
+            canvas.drawBitmap(
+                emptySlotBitmap,
+                null,
+                dst,
+                paint
+            )
+
+            if (i < moveHistory.size) {
+
+                val iconBitmap = when (moveHistory[i]) {
+
+                    Direction.UP -> upIconBitmap
+
+                    Direction.DOWN -> downIconBitmap
+
+                    Direction.LEFT -> leftIconBitmap
+
+                    Direction.RIGHT -> rightIconBitmap
+                }
+
+                canvas.drawBitmap(
+                    iconBitmap,
+                    null,
+                    dst,
+                    paint
+                )
+            }
+        }
+    }
+
+    private fun recordMove(direction: Direction) {
+
+        if (moveHistory.size >= currentStage.moveLimit) {
+            return
+        }
+
+        moveHistory.add(direction)
+    }
+
     fun moveRight() {
 
         if (isMoving) return
+
+        recordMove(Direction.RIGHT)
 
         facingRight = true
 
         targetX += tileSize
 
         isMoving = true
+
         state = State.RUN
     }
 
@@ -202,11 +313,14 @@ class GameView @JvmOverloads constructor(
 
         if (isMoving) return
 
+        recordMove(Direction.LEFT)
+
         facingRight = false
 
         targetX -= tileSize
 
         isMoving = true
+
         state = State.RUN
     }
 
@@ -214,9 +328,12 @@ class GameView @JvmOverloads constructor(
 
         if (isMoving) return
 
+        recordMove(Direction.UP)
+
         targetY -= tileSize
 
         isMoving = true
+
         state = State.RUN
     }
 
@@ -224,9 +341,12 @@ class GameView @JvmOverloads constructor(
 
         if (isMoving) return
 
+        recordMove(Direction.DOWN)
+
         targetY += tileSize
 
         isMoving = true
+
         state = State.RUN
     }
 }
