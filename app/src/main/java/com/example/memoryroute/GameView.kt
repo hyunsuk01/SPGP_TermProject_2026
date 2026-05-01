@@ -19,9 +19,7 @@ class GameView @JvmOverloads constructor(
     )
 
     private val stages = listOf(
-        Stage(4),
-        Stage(5),
-        Stage(7)
+        Stage(4)
     )
 
     private var stageIndex = 0
@@ -35,6 +33,12 @@ class GameView @JvmOverloads constructor(
         RIGHT
     }
 
+    private enum class State {
+        IDLE,
+        RUN,
+        DEATH
+    }
+
     private val background =
         BitmapFactory.decodeResource(resources, R.drawable.city1)
 
@@ -44,11 +48,17 @@ class GameView @JvmOverloads constructor(
     private val runBitmap =
         BitmapFactory.decodeResource(resources, R.drawable.run)
 
+    private val deathBitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.death)
+
     private val shadowIdleBitmap =
         BitmapFactory.decodeResource(resources, R.drawable.shadow_idle)
 
     private val shadowRunBitmap =
         BitmapFactory.decodeResource(resources, R.drawable.shadow_run)
+
+    private val shadowDeathBitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.shadow_death)
 
     private val emptySlotBitmap =
         BitmapFactory.decodeResource(resources, R.drawable.empty_slot)
@@ -71,17 +81,23 @@ class GameView @JvmOverloads constructor(
 
     private val tileSize = 150f
 
-    private var playerX = 300f
-    private var playerY = 300f
+    private val startX = 300f
+    private val startY = 300f
+
+    private var playerX = startX
+    private var playerY = startY
 
     private var targetX = playerX
     private var targetY = playerY
 
     private var isMoving = false
+
     private var facingRight = true
 
-    private var shadowX = 300f
-    private var shadowY = 300f
+    private var state = State.IDLE
+
+    private var shadowX = startX
+    private var shadowY = startY
 
     private var shadowTargetX = shadowX
     private var shadowTargetY = shadowY
@@ -93,13 +109,6 @@ class GameView @JvmOverloads constructor(
     private var shadowVisible = false
 
     private var shadowReady = false
-
-    private enum class State {
-        IDLE,
-        RUN
-    }
-
-    private var state = State.IDLE
 
     private var shadowState = State.IDLE
 
@@ -115,6 +124,10 @@ class GameView @JvmOverloads constructor(
 
     private var replayIndex = 0
 
+    private var isDead = false
+
+    private var deathStartTime = 0L
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -126,11 +139,15 @@ class GameView @JvmOverloads constructor(
 
         updateAnimation()
 
+        checkCollision()
+
         drawPlayer(canvas)
 
         drawShadow(canvas)
 
         drawMoveSlots(canvas)
+
+        updateDeath()
 
         invalidate()
     }
@@ -158,36 +175,28 @@ class GameView @JvmOverloads constructor(
         val speed = 8f
 
         if (playerX < targetX) {
-
             playerX += speed
-
             if (playerX >= targetX) {
                 playerX = targetX
             }
         }
 
         if (playerX > targetX) {
-
             playerX -= speed
-
             if (playerX <= targetX) {
                 playerX = targetX
             }
         }
 
         if (playerY < targetY) {
-
             playerY += speed
-
             if (playerY >= targetY) {
                 playerY = targetY
             }
         }
 
         if (playerY > targetY) {
-
             playerY -= speed
-
             if (playerY <= targetY) {
                 playerY = targetY
             }
@@ -197,10 +206,13 @@ class GameView @JvmOverloads constructor(
 
             isMoving = false
 
-            state = State.IDLE
-
-            currentFrame = 0
+            if (state != State.DEATH) {
+                state = State.IDLE
+                currentFrame = 0
+            }
         }
+
+        checkBoundary()
     }
 
     private fun updateShadowMovement() {
@@ -210,36 +222,28 @@ class GameView @JvmOverloads constructor(
         val speed = 8f
 
         if (shadowX < shadowTargetX) {
-
             shadowX += speed
-
             if (shadowX >= shadowTargetX) {
                 shadowX = shadowTargetX
             }
         }
 
         if (shadowX > shadowTargetX) {
-
             shadowX -= speed
-
             if (shadowX <= shadowTargetX) {
                 shadowX = shadowTargetX
             }
         }
 
         if (shadowY < shadowTargetY) {
-
             shadowY += speed
-
             if (shadowY >= shadowTargetY) {
                 shadowY = shadowTargetY
             }
         }
 
         if (shadowY > shadowTargetY) {
-
             shadowY -= speed
-
             if (shadowY <= shadowTargetY) {
                 shadowY = shadowTargetY
             }
@@ -249,10 +253,13 @@ class GameView @JvmOverloads constructor(
 
             shadowMoving = false
 
-            shadowState = State.IDLE
-
-            shadowFrame = 0
+            if (shadowState != State.DEATH) {
+                shadowState = State.IDLE
+                shadowFrame = 0
+            }
         }
+
+        checkBoundary()
     }
 
     private fun updateAnimation() {
@@ -264,13 +271,21 @@ class GameView @JvmOverloads constructor(
             frameTimer = currentTime
 
             val playerFrameCount =
-                if (state == State.IDLE) 4 else 6
+                when (state) {
+                    State.IDLE -> 4
+                    State.RUN -> 6
+                    State.DEATH -> 8
+                }
 
             currentFrame =
                 (currentFrame + 1) % playerFrameCount
 
             val shadowFrameCount =
-                if (shadowState == State.IDLE) 4 else 6
+                when (shadowState) {
+                    State.IDLE -> 4
+                    State.RUN -> 6
+                    State.DEATH -> 8
+                }
 
             shadowFrame =
                 (shadowFrame + 1) % shadowFrameCount
@@ -280,10 +295,18 @@ class GameView @JvmOverloads constructor(
     private fun drawPlayer(canvas: Canvas) {
 
         val bitmap =
-            if (state == State.IDLE) idleBitmap else runBitmap
+            when (state) {
+                State.IDLE -> idleBitmap
+                State.RUN -> runBitmap
+                State.DEATH -> deathBitmap
+            }
 
         val frameCount =
-            if (state == State.IDLE) 4 else 6
+            when (state) {
+                State.IDLE -> 4
+                State.RUN -> 6
+                State.DEATH -> 8
+            }
 
         val frameWidth = bitmap.width / frameCount
 
@@ -329,13 +352,18 @@ class GameView @JvmOverloads constructor(
         if (!shadowVisible) return
 
         val bitmap =
-            if (shadowState == State.IDLE)
-                shadowIdleBitmap
-            else
-                shadowRunBitmap
+            when (shadowState) {
+                State.IDLE -> shadowIdleBitmap
+                State.RUN -> shadowRunBitmap
+                State.DEATH -> shadowDeathBitmap
+            }
 
         val frameCount =
-            if (shadowState == State.IDLE) 4 else 6
+            when (shadowState) {
+                State.IDLE -> 4
+                State.RUN -> 6
+                State.DEATH -> 8
+            }
 
         val frameWidth = bitmap.width / frameCount
 
@@ -408,16 +436,17 @@ class GameView @JvmOverloads constructor(
 
             if (i < moveHistory.size) {
 
-                val iconBitmap = when (moveHistory[i]) {
+                val iconBitmap =
+                    when (moveHistory[i]) {
 
-                    Direction.UP -> upIconBitmap
+                        Direction.UP -> upIconBitmap
 
-                    Direction.DOWN -> downIconBitmap
+                        Direction.DOWN -> downIconBitmap
 
-                    Direction.LEFT -> leftIconBitmap
+                        Direction.LEFT -> leftIconBitmap
 
-                    Direction.RIGHT -> rightIconBitmap
-                }
+                        Direction.RIGHT -> rightIconBitmap
+                    }
 
                 canvas.drawBitmap(
                     iconBitmap,
@@ -446,8 +475,8 @@ class GameView @JvmOverloads constructor(
 
             shadowReady = true
 
-            shadowX = 300f
-            shadowY = 300f
+            shadowX = startX
+            shadowY = startY
 
             shadowTargetX = shadowX
             shadowTargetY = shadowY
@@ -503,9 +532,110 @@ class GameView @JvmOverloads constructor(
         replayIndex++
     }
 
+    private fun checkBoundary() {
+
+        if (isDead) return
+
+        if (
+            playerX < 0f ||
+            playerY < 0f ||
+            playerX + 150f > width ||
+            playerY + 150f > height
+        ) {
+            startDeath()
+        }
+
+        if (
+            shadowVisible &&
+            (
+                    shadowX < 0f ||
+                            shadowY < 0f ||
+                            shadowX + 150f > width ||
+                            shadowY + 150f > height
+                    )
+        ) {
+            startDeath()
+        }
+    }
+
+    private fun checkCollision() {
+
+        if (!shadowVisible) return
+
+        if (isDead) return
+
+        val distanceX = kotlin.math.abs(playerX - shadowX)
+        val distanceY = kotlin.math.abs(playerY - shadowY)
+
+        if (distanceX < 80f && distanceY < 80f) {
+            startDeath()
+        }
+    }
+
+    private fun startDeath() {
+
+        isDead = true
+
+        deathStartTime = System.currentTimeMillis()
+
+        state = State.DEATH
+        shadowState = State.DEATH
+
+        currentFrame = 0
+        shadowFrame = 0
+
+        isMoving = false
+        shadowMoving = false
+    }
+
+    private fun updateDeath() {
+
+        if (!isDead) return
+
+        val currentTime = System.currentTimeMillis()
+
+        if (currentTime - deathStartTime > 1000L) {
+            resetStage()
+        }
+    }
+
+    private fun resetStage() {
+
+        playerX = startX
+        playerY = startY
+
+        targetX = playerX
+        targetY = playerY
+
+        shadowX = startX
+        shadowY = startY
+
+        shadowTargetX = shadowX
+        shadowTargetY = shadowY
+
+        moveHistory.clear()
+
+        replayIndex = 0
+
+        shadowVisible = false
+
+        shadowReady = false
+
+        isMoving = false
+        shadowMoving = false
+
+        state = State.IDLE
+        shadowState = State.IDLE
+
+        currentFrame = 0
+        shadowFrame = 0
+
+        isDead = false
+    }
+
     fun moveRight() {
 
-        if (isMoving) return
+        if (isMoving || isDead) return
 
         recordMove(Direction.RIGHT)
 
@@ -524,7 +654,7 @@ class GameView @JvmOverloads constructor(
 
     fun moveLeft() {
 
-        if (isMoving) return
+        if (isMoving || isDead) return
 
         recordMove(Direction.LEFT)
 
@@ -543,7 +673,7 @@ class GameView @JvmOverloads constructor(
 
     fun moveUp() {
 
-        if (isMoving) return
+        if (isMoving || isDead) return
 
         recordMove(Direction.UP)
 
@@ -560,7 +690,7 @@ class GameView @JvmOverloads constructor(
 
     fun moveDown() {
 
-        if (isMoving) return
+        if (isMoving || isDead) return
 
         recordMove(Direction.DOWN)
 
