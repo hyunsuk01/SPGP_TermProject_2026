@@ -9,101 +9,47 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
 
-class GameView @JvmOverloads constructor(
+class GameView2 @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
-    data class Stage(
-        val moveLimit: Int
-    )
+    data class Stage(val moveLimit: Int)
 
-    private val stages = listOf(
-        Stage(4)
-    )
-
+    private val stages = listOf(Stage(5))
     private var stageIndex = 0
-
     private var currentStage = stages[stageIndex]
 
-    enum class Direction {
-        UP,
-        DOWN,
-        LEFT,
-        RIGHT
-    }
+    enum class Direction { UP, DOWN, LEFT, RIGHT }
+    private enum class State { IDLE, RUN, DEATH, CLIMB }
 
-    private enum class State {
-        IDLE,
-        RUN,
-        DEATH,
-        CLIMB
-    }
+    private val background = BitmapFactory.decodeResource(resources, R.drawable.city1)
+    private val idleBitmap = BitmapFactory.decodeResource(resources, R.drawable.idle)
+    private val runBitmap = BitmapFactory.decodeResource(resources, R.drawable.run)
+    private val deathBitmap = BitmapFactory.decodeResource(resources, R.drawable.death)
+    private val climbBitmap = BitmapFactory.decodeResource(resources, R.drawable.climb)
 
-    private val background =
-        BitmapFactory.decodeResource(resources, R.drawable.city1)
+    private val shadowIdleBitmap = BitmapFactory.decodeResource(resources, R.drawable.shadow_idle)
+    private val shadowRunBitmap = BitmapFactory.decodeResource(resources, R.drawable.shadow_run)
+    private val shadowDeathBitmap = BitmapFactory.decodeResource(resources, R.drawable.shadow_death)
+    private val shadowClimbBitmap = BitmapFactory.decodeResource(resources, R.drawable.shadow_climb)
 
-    private val idleBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.idle)
+    private val emptySlotBitmap = BitmapFactory.decodeResource(resources, R.drawable.empty_slot)
+    private val upIconBitmap = BitmapFactory.decodeResource(resources, R.drawable.up)
+    private val downIconBitmap = BitmapFactory.decodeResource(resources, R.drawable.down)
+    private val leftIconBitmap = BitmapFactory.decodeResource(resources, R.drawable.left)
+    private val rightIconBitmap = BitmapFactory.decodeResource(resources, R.drawable.right)
 
-    private val runBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.run)
-
-    private val deathBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.death)
-
-    private val climbBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.climb)
-
-    private val shadowIdleBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.shadow_idle)
-
-    private val shadowRunBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.shadow_run)
-
-    private val shadowDeathBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.shadow_death)
-
-    private val shadowClimbBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.shadow_climb)
-
-    private val emptySlotBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.empty_slot)
-
-    private val upIconBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.up)
-
-    private val downIconBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.down)
-
-    private val leftIconBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.left)
-
-    private val rightIconBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.right)
-
-    private val flagBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.flag)
-
-    private val floorBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.floor)
-
-    private val ladderBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.ladder)
-
-    private val buttonBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.button)
-
-    private val buttonFloorBitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.button_floor)
+    private val flagBitmap = BitmapFactory.decodeResource(resources, R.drawable.flag)
+    private val floorBitmap = BitmapFactory.decodeResource(resources, R.drawable.floor)
+    private val ladderBitmap = BitmapFactory.decodeResource(resources, R.drawable.ladder)
+    private val buttonBitmap = BitmapFactory.decodeResource(resources, R.drawable.button)
+    private val buttonFloorBitmap = BitmapFactory.decodeResource(resources, R.drawable.button_floor)
     private val buttonFloor1Bitmap = BitmapFactory.decodeResource(resources, R.drawable.button_floor1)
 
-    private val paint = Paint().apply {
-        isFilterBitmap = false
-    }
+    private val paint = Paint().apply { isFilterBitmap = false }
 
     private val characterSize = 150f
-
     private var tileSizeX = 0f
     private var tileSizeY = 150f
 
@@ -113,166 +59,133 @@ class GameView @JvmOverloads constructor(
 
     private var playerX = 0f
     private var playerY = 0f
-
     private var targetX = 0f
     private var targetY = 0f
 
     private var isMoving = false
-
     private var facingRight = true
-
     private var state = State.IDLE
 
     private var shadowX = 0f
     private var shadowY = 0f
-
     private var shadowTargetX = 0f
     private var shadowTargetY = 0f
 
     private var shadowMoving = false
-
     private var shadowFacingRight = true
-
     private var shadowVisible = false
-
     private var shadowReady = false
-
     private var shadowState = State.IDLE
 
     private var currentFrame = 0
-
     private var shadowFrame = 0
-
     private var flagFrame = 0
-
     private var buttonFrame = 0
 
     private var frameTimer = 0L
-
     private val frameDelay = 120L
 
     private val moveHistory = mutableListOf<Direction>()
-
     private var replayIndex = 0
 
     private var isDead = false
-
     private var deathStartTime = 0L
 
-    private val mapCols = 6
+    private val mapCols = 5
     private val mapRows = 4
     private var isSwitchPressed = false
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-
         tileSizeX = (w * 0.75f) / mapCols
         resetPosition()
     }
 
     private fun resetPosition() {
-        playerX = startX
-        playerY = startY
+        playerX = startX + (2 * tileSizeX)
+        playerY = startY + (0 * tileSizeY)
         targetX = playerX
         targetY = playerY
-        shadowX = startX
-        shadowY = startY
+
+        shadowX = playerX
+        shadowY = playerY
         shadowTargetX = shadowX
         shadowTargetY = shadowY
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-
         drawBackground(canvas)
-
         drawMapAssets(canvas)
-
         updateMovement()
-
         updateShadowMovement()
-
         updateAnimation()
-
         checkCollision()
 
         drawCharacter(canvas, playerX, playerY, state, currentFrame, facingRight, false)
-
         drawCharacter(canvas, shadowX, shadowY, shadowState, shadowFrame, shadowFacingRight, true)
-
         drawMoveSlots(canvas)
-
         updateDeath()
-
         invalidate()
     }
 
     private fun drawBackground(canvas: Canvas) {
-
         val scale = width.toFloat() / background.width
-
         val scaledHeight = (background.height * scale).toInt()
-
-        val dst = Rect(
-            0,
-            0,
-            width,
-            scaledHeight
-        )
-
+        val dst = Rect(0, 0, width, scaledHeight)
         canvas.drawBitmap(background, null, dst, paint)
     }
 
     private fun drawMapAssets(canvas: Canvas) {
-        for (i in 0 until 36) {
+        for (i in 0 until 20) {
             val col = i % mapCols
             val row = i / mapCols
             val x = startX + col * tileSizeX
             val y = startY + row * tileSizeY
 
             val floorHeight = tileSizeY * 0.5f
-
-            val floorTop = y + (tileSizeY - floorHeight) + visualFloorOffset * 2.5f
-
+            val floorTop = y + (tileSizeY - floorHeight) + visualFloorOffset * 0.5f
             val floorDst = RectF(x, floorTop, x + tileSizeX, floorTop + floorHeight)
 
-            when (i + 1) {
-                7, 8, 9, 10, 12, 19, 20, 21, 22, 23, 24, 31, 34 -> {
+            val tileNum = i + 1
+
+            when (tileNum) {
+                3, 5, 7, 10, 12, 13, 14, 15, 16 -> {
                     canvas.drawBitmap(floorBitmap, null, floorDst, paint)
                 }
-                11 -> {
-                    val bFloor = if (isSwitchPressed) floorBitmap else buttonFloorBitmap
+                4, 11 -> {
+                    val bFloor = if (!isSwitchPressed) buttonFloor1Bitmap else buttonFloorBitmap
                     canvas.drawBitmap(bFloor, null, floorDst, paint)
                 }
-                6 -> {
+            }
+
+            when (tileNum) {
+                16 -> {
                     val fWidth = flagBitmap.width / 9
                     val fSrc = Rect(flagFrame * fWidth, 0, (flagFrame + 1) * fWidth, flagBitmap.height)
-
-                    val flagH = tileSizeY * 0.6f
-                    val objectBottom = floorTop - visualFloorOffset * 1.5f
-
-                    val flagDst = RectF(x, objectBottom - flagH, x + tileSizeX, objectBottom)
+                    val flagH = tileSizeY * 0.7f
+                    val flagDst = RectF(x, floorTop - flagH, x + tileSizeX, floorTop)
                     canvas.drawBitmap(flagBitmap, fSrc, flagDst, paint)
                 }
-                17 -> {
+                12 -> {
                     val bWidth = buttonBitmap.width / 4
                     val bSrc = Rect(buttonFrame * bWidth, 0, (buttonFrame + 1) * bWidth, buttonBitmap.height)
-
-                    val btnW = tileSizeX * 0.4f
-                    val btnH = tileSizeY * 0.4f
-                    val objectBottom = floorTop - visualFloorOffset * 1.5f
-
-                    val btnDst = RectF(x + (tileSizeX - btnW) / 2f, objectBottom - btnH, x + (tileSizeX + btnW) / 2f, objectBottom)
+                    val btnW = tileSizeX * 0.5f
+                    val btnH = tileSizeY * 0.3f
+                    val btnDst = RectF(x + (tileSizeX - btnW) / 2f, floorTop - btnH, x + (tileSizeX + btnW) / 2f, floorTop)
                     canvas.drawBitmap(buttonBitmap, bSrc, btnDst, paint)
                 }
-                14 -> {
-                    val ladderW = tileSizeX * 0.4f
-                    val objectBottom = floorTop - visualFloorOffset * 1.5f
+            }
 
-                    val upperFloorTop = floorTop - tileSizeY
-                    val ladderDst = RectF(x + (tileSizeX - ladderW) / 2f, upperFloorTop, x + (tileSizeX + ladderW) / 2f, objectBottom)
-                    canvas.drawBitmap(ladderBitmap, null, ladderDst, paint)
-                }
+            if (tileNum == 7) {
+                val ladderW = tileSizeX * 0.4f
+                val ladderDst = RectF(
+                    x + (tileSizeX - ladderW) / 2f,
+                    floorTop,
+                    x + (tileSizeX + ladderW) / 2f,
+                    floorTop + tileSizeY
+                )
+                canvas.drawBitmap(ladderBitmap, null, ladderDst, paint)
             }
         }
     }
@@ -298,64 +211,82 @@ class GameView @JvmOverloads constructor(
 
         val drawX = x + (tileSizeX - characterSize) / 2f
         val floorHeight = tileSizeY * 0.5f
-        val floorTop = y + (tileSizeY - floorHeight) + visualFloorOffset
-        val dst = RectF(drawX, floorTop - characterSize, drawX + characterSize, floorTop)
+        val characterFloorTop = y + (tileSizeY - floorHeight) + visualFloorOffset * 0.5f
+        val dst = RectF(drawX, characterFloorTop - characterSize, drawX + characterSize, characterFloorTop)
 
         if (isRight || curState == State.CLIMB) {
             canvas.drawBitmap(bitmap, src, dst, paint)
         } else {
             canvas.save()
-            canvas.scale(-1f, 1f, drawX + characterSize / 2, floorTop - characterSize / 2)
+            canvas.scale(-1f, 1f, drawX + characterSize / 2, characterFloorTop - characterSize / 2)
             canvas.drawBitmap(bitmap, src, dst, paint)
             canvas.restore()
         }
     }
 
     private fun updateMovement() {
-
         if (!isMoving) return
 
         val speed = tileSizeX / 10f
-
         playerX = moveToward(playerX, targetX, speed)
+
+        if (state == State.IDLE && playerY != targetY) {
+            val pIdx = getCurrentIndex(playerX, playerY) + 1
+            val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
+            val isButtonFloorValid = !isSwitchPressed && (pIdx == 4 || pIdx == 11)
+
+            if (permanentTiles.contains(pIdx) || isButtonFloorValid) {
+                targetY = startY + (Math.round((playerY - startY) / tileSizeY) * tileSizeY)
+                playerY = targetY
+                isMoving = false
+                checkTileEffect()
+                return
+            }
+        }
+
         playerY = moveToward(playerY, targetY, speed)
 
         if (playerX == targetX && playerY == targetY) {
-
             isMoving = false
-
             if (state != State.DEATH) {
                 state = State.IDLE
                 currentFrame = 0
             }
-
             checkTileEffect()
         }
-
         checkBoundary()
     }
 
     private fun updateShadowMovement() {
-
         if (!shadowMoving) return
 
         val speed = tileSizeX / 10f
-
         shadowX = moveToward(shadowX, shadowTargetX, speed)
+
+        if (shadowState == State.IDLE && shadowY != shadowTargetY) {
+            val sIdx = getCurrentIndex(shadowX, shadowY) + 1
+            val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
+            val isButtonFloorValid = !isSwitchPressed && (sIdx == 4 || sIdx == 11)
+
+            if (permanentTiles.contains(sIdx) || isButtonFloorValid) {
+                shadowTargetY = startY + (Math.round((shadowY - startY) / tileSizeY) * tileSizeY)
+                shadowY = shadowTargetY
+                shadowMoving = false
+                checkTileEffect()
+                return
+            }
+        }
+
         shadowY = moveToward(shadowY, shadowTargetY, speed)
 
         if (shadowX == shadowTargetX && shadowY == shadowTargetY) {
-
             shadowMoving = false
-
             if (shadowState != State.DEATH) {
                 shadowState = State.IDLE
                 shadowFrame = 0
             }
-
             checkTileEffect()
         }
-
         checkBoundary()
     }
 
@@ -366,17 +297,11 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun updateAnimation() {
-
         val currentTime = System.currentTimeMillis()
-
         if (currentTime - frameTimer > frameDelay) {
-
             frameTimer = currentTime
-
             currentFrame = (currentFrame + 1) % getFrameLimit(state)
-
             shadowFrame = (shadowFrame + 1) % getFrameLimit(shadowState)
-
             flagFrame = (flagFrame + 1) % 9
 
             if (isSwitchPressed) {
@@ -394,240 +319,141 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun drawMoveSlots(canvas: Canvas) {
-
         val slotSize = 120f
-
-        val totalWidth =
-            currentStage.moveLimit * slotSize
-
-        val startXPos =
-            (width - totalWidth) / 2f
-
+        val totalWidth = currentStage.moveLimit * slotSize
+        val startXPos = (width - totalWidth) / 2f
         val y = 40f
 
         for (i in 0 until currentStage.moveLimit) {
-
             val left = startXPos + i * slotSize
+            val dst = RectF(left, y, left + 110f, y + 110f)
 
-            val dst = RectF(
-                left,
-                y,
-                left + 110f,
-                y + 110f
-            )
-
-            canvas.drawBitmap(
-                emptySlotBitmap,
-                null,
-                dst,
-                paint)
+            canvas.drawBitmap(emptySlotBitmap, null, dst, paint)
 
             if (i < moveHistory.size) {
-
-                val iconBitmap =
-                    when (moveHistory[i]) {
-
-                        Direction.UP -> upIconBitmap
-
-                        Direction.DOWN -> downIconBitmap
-
-                        Direction.LEFT -> leftIconBitmap
-
-                        Direction.RIGHT -> rightIconBitmap
-                    }
-
-                canvas.drawBitmap(
-                    iconBitmap,
-                    null,
-                    dst,
-                    paint)
+                val iconBitmap = when (moveHistory[i]) {
+                    Direction.UP -> upIconBitmap
+                    Direction.DOWN -> downIconBitmap
+                    Direction.LEFT -> leftIconBitmap
+                    Direction.RIGHT -> rightIconBitmap
+                }
+                canvas.drawBitmap(iconBitmap, null, dst, paint)
             }
         }
     }
 
     private fun recordMove(direction: Direction) {
-
-        if (moveHistory.size >= currentStage.moveLimit) {
-            return
-        }
-
+        if (moveHistory.size >= currentStage.moveLimit) return
         moveHistory.add(direction)
 
-        if (
-            moveHistory.size == currentStage.moveLimit &&
-            !shadowVisible
-        ) {
-
+        if (moveHistory.size == currentStage.moveLimit && !shadowVisible) {
             shadowVisible = true
-
             shadowReady = true
 
-            shadowX = startX
-            shadowY = startY
-
+            shadowX = startX + (2 * tileSizeX)
+            shadowY = startY + (0 * tileSizeY)
             shadowTargetX = shadowX
             shadowTargetY = shadowY
         }
     }
 
     private fun moveShadow() {
-
         if (!shadowVisible) return
-
         if (shadowReady) {
-
             shadowReady = false
-
             return
         }
-
-        if (replayIndex >= moveHistory.size) {
-            return
-        }
+        if (replayIndex >= moveHistory.size) return
 
         when (moveHistory[replayIndex]) {
-
             Direction.RIGHT -> {
-
                 shadowTargetX += tileSizeX
-
                 shadowFacingRight = true
-
                 shadowState = State.RUN
             }
-
             Direction.LEFT -> {
-
                 shadowTargetX -= tileSizeX
-
                 shadowFacingRight = false
-
                 shadowState = State.RUN
             }
-
             Direction.UP -> {
                 val idx = getCurrentIndex(shadowX, shadowY) + 1
-                if (idx == 14) {
-                    shadowTargetY -= tileSizeY * 2
+                if (idx == 12) {
+                    shadowTargetY -= tileSizeY
                     shadowState = State.CLIMB
                 }
             }
-
             Direction.DOWN -> {
                 val idx = getCurrentIndex(shadowX, shadowY) + 1
-                if (idx == 2) {
-                    shadowTargetY += tileSizeY * 2
+                if (idx == 7) {
+                    shadowTargetY += tileSizeY
                     shadowState = State.CLIMB
                 }
             }
         }
-
         shadowMoving = true
-
         shadowFrame = 0
-
         replayIndex++
     }
 
     private fun checkBoundary() {
-
         if (isDead) return
-
-        if (
-            playerX < 0f ||
-            playerY < 0f ||
-            playerY + tileSizeY > height
-        ) {
+        if (playerX < 0f || playerY < 0f || playerY + tileSizeY > height) {
             startDeath()
         }
-
-        if (
-            shadowVisible &&
-            (
-                    shadowX < 0f ||
-                            shadowY < 0f ||
-                            shadowY + tileSizeY > height
-                    )
-        ) {
+        if (shadowVisible && (shadowX < 0f || shadowY < 0f || shadowY + tileSizeY > height)) {
             startDeath()
         }
     }
 
     private fun checkCollision() {
-
         if (!shadowVisible) return
-
         if (isDead) return
-
         if (Math.abs(playerX - shadowX) < tileSizeX * 0.4f && Math.abs(playerY - shadowY) < tileSizeY * 0.4f) {
             startDeath()
         }
     }
 
     private fun startDeath() {
-
         isDead = true
-
         deathStartTime = System.currentTimeMillis()
-
         state = State.DEATH
         shadowState = State.DEATH
-
         currentFrame = 0
         shadowFrame = 0
-
         isMoving = false
         shadowMoving = false
     }
 
     private fun updateDeath() {
-
         if (!isDead) return
-
         val currentTime = System.currentTimeMillis()
-
         if (currentTime - deathStartTime > 1000L) {
             resetStage()
         }
     }
 
     private fun resetStage() {
-
         resetPosition()
-
         moveHistory.clear()
-
         replayIndex = 0
-
         shadowVisible = false
-
         shadowReady = false
-
         isMoving = false
-
         shadowMoving = false
-
         state = State.IDLE
-
         shadowState = State.IDLE
-
         currentFrame = 0
-
         shadowFrame = 0
-
         isDead = false
-
         isSwitchPressed = false
-
         buttonFrame = 0
     }
 
     private fun getCurrentIndex(x: Float, y: Float): Int {
         val col = Math.round((x - startX) / tileSizeX)
         val row = Math.round((y - startY) / tileSizeY)
-
         if (col < 0 || col >= mapCols || row < 0 || row >= mapRows) return -1
-
         return row * mapCols + col
     }
 
@@ -635,116 +461,139 @@ class GameView @JvmOverloads constructor(
         val pIdx = getCurrentIndex(playerX, playerY) + 1
         val sIdx = if (shadowVisible) getCurrentIndex(shadowX, shadowY) + 1 else -1
 
-        isSwitchPressed = (pIdx == 17 || sIdx == 17)
+        isSwitchPressed = (pIdx == 12 || sIdx == 12)
 
-        val colP = Math.round((playerX - startX) / tileSizeX).toInt()
-        val rowP = Math.round((playerY - startY) / tileSizeY).toInt()
+        val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
 
-        if (playerX < startX - 10f || colP >= mapCols || pIdx == -1) {
-            targetY = height.toFloat() + characterSize
-            isMoving = true
-            state = State.RUN
-        }
+        val isPlayerOnValidTile = permanentTiles.contains(pIdx) || (!isSwitchPressed && (pIdx == 4 || pIdx == 11))
 
-        if (shadowVisible) {
-            val colS = Math.round((shadowX - startX) / tileSizeX).toInt()
-            if (shadowX < startX - 10f || colS >= mapCols || sIdx == -1) {
-                shadowTargetY = height.toFloat() + characterSize
-                shadowMoving = true
-                shadowState = State.RUN
+        if (pIdx == -1 || !isPlayerOnValidTile) {
+
+            val currentCol = Math.round((playerX - startX) / tileSizeX).toInt()
+            var currentRow = Math.round((playerY - startY) / tileSizeY).toInt()
+
+            var foundLandingRow = -1
+            var isFatalFall = true
+
+            for (nextRow in (currentRow + 1) until mapRows) {
+                val checkIdx = (nextRow * mapCols + currentCol) + 1
+
+                val isValidLanding = permanentTiles.contains(checkIdx) || (!isSwitchPressed && (checkIdx == 4 || checkIdx == 11))
+
+                if (isValidLanding) {
+                    foundLandingRow = nextRow
+                    isFatalFall = false
+                    break
+                }
+            }
+
+            if (!isFatalFall && foundLandingRow != -1) {
+                playerX = startX + (currentCol * tileSizeX)
+
+                val rowDiff = foundLandingRow - currentRow
+                targetY += (tileSizeY * rowDiff)
+                isMoving = true
+                state = State.IDLE
+            } else {
+                triggerFall(false, true)
             }
         }
 
-        if (pIdx == 5 && !isSwitchPressed) {
-            targetY = startY + ((rowP + 1) * tileSizeY)
-            isMoving = true
-            state = State.RUN
+        if (shadowVisible) {
+            val isShadowOnValidTile = permanentTiles.contains(sIdx) || (!isSwitchPressed && (sIdx == 4 || sIdx == 11))
+
+            if (sIdx == -1 || !isShadowOnValidTile) {
+                val currentColS = Math.round((shadowX - startX) / tileSizeX).toInt()
+                var currentRowS = Math.round((shadowY - startY) / tileSizeY).toInt()
+
+                var foundLandingRowS = -1
+                var isFatalFallS = true
+
+                for (nextRowS in (currentRowS + 1) until mapRows) {
+                    val checkIdxS = (nextRowS * mapCols + currentColS) + 1
+                    val isValidLandingS = permanentTiles.contains(checkIdxS) || (!isSwitchPressed && (checkIdxS == 4 || checkIdxS == 11))
+
+                    if (isValidLandingS) {
+                        foundLandingRowS = nextRowS
+                        isFatalFallS = false
+                        break
+                    }
+                }
+
+                if (!isFatalFallS && foundLandingRowS != -1) {
+                    shadowX = startX + (currentColS * tileSizeX)
+                    val rowDiffS = foundLandingRowS - currentRowS
+                    shadowTargetY += (tileSizeY * rowDiffS)
+                    shadowMoving = true
+                    shadowState = State.IDLE
+                } else {
+                    triggerFall(true, true)
+                }
+            }
         }
 
-        if (shadowVisible && sIdx == 5 && !isSwitchPressed) {
-            val rowS = Math.round((shadowY - startY) / tileSizeY).toInt()
-            shadowTargetY = startY + ((rowS + 1) * tileSizeY)
-            shadowMoving = true
-            shadowState = State.RUN
-        }
-
-        if (pIdx == 11 && !isSwitchPressed) {
-            targetY = startY + ((rowP + 1) * tileSizeY)
-            isMoving = true
-            state = State.RUN
-        }
-
-        if (shadowVisible && sIdx == 11 && !isSwitchPressed) {
-            val rowS = Math.round((shadowY - startY) / tileSizeY).toInt()
-            shadowTargetY = startY + ((rowS + 1) * tileSizeY)
-            shadowMoving = true
-            shadowState = State.RUN
-        }
-
-        if (pIdx == 6) {
+        if (pIdx == 16) {
             resetStage()
         }
     }
 
+    private fun triggerFall(isShadowEntity: Boolean, isFatal: Boolean) {
+        if (!isShadowEntity) {
+            if (isFatal) {
+                targetY = height.toFloat() + characterSize
+            } else {
+                targetY += tileSizeY
+            }
+            isMoving = true
+            state = if (isFatal) State.RUN else State.IDLE
+        } else {
+            if (isFatal) {
+                shadowTargetY = height.toFloat() + characterSize
+            } else {
+                shadowTargetY += tileSizeY
+            }
+            shadowMoving = true
+            shadowState = if (isFatal) State.RUN else State.IDLE
+        }
+    }
+
     fun moveRight() {
-
         if (isMoving || isDead) return
-
         recordMove(Direction.RIGHT)
-
         facingRight = true
-
         targetX += tileSizeX
-
         state = State.RUN
-
         startMove()
     }
 
     fun moveLeft() {
-
         if (isMoving || isDead) return
-
         recordMove(Direction.LEFT)
-
         facingRight = false
-
         targetX -= tileSizeX
-
         state = State.RUN
-
         startMove()
     }
 
     fun moveUp() {
-
         if (isMoving || isDead) return
-
         val idx = getCurrentIndex(playerX, playerY) + 1
-        if (idx != 14) return
+        if (idx != 12) return
 
         recordMove(Direction.UP)
-
-        targetY -= tileSizeY * 2
-
+        targetY -= tileSizeY
         state = State.CLIMB
-
         startMove()
     }
 
     fun moveDown() {
-
         if (isMoving || isDead) return
-
         val idx = getCurrentIndex(playerX, playerY) + 1
-        if (idx != 2) return
+        if (idx != 7) return
 
         recordMove(Direction.DOWN)
-
-        targetY += tileSizeY * 2
-
+        targetY += tileSizeY
         state = State.CLIMB
-
         startMove()
     }
 

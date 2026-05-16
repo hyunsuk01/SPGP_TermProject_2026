@@ -10,7 +10,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val gameView = findViewById<GameView>(R.id.gameView)
+        val gameView = findViewById<GameView2>(R.id.gameView)
 
         findViewById<ImageButton>(R.id.btnUp).setOnClickListener {
             gameView.moveUp()
