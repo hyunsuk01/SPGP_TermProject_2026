@@ -1,6 +1,7 @@
 package com.example.memoryroute
 
 import android.os.Bundle
+import android.view.View
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 
@@ -10,21 +11,35 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val gameView = findViewById<GameView2>(R.id.gameView)
+        val gameView = findViewById<GameView>(R.id.gameView)
 
-        findViewById<ImageButton>(R.id.btnUp).setOnClickListener {
+        val btnUp = findViewById<ImageButton>(R.id.btnUp)
+        val btnDown = findViewById<ImageButton>(R.id.btnDown)
+        val btnLeft = findViewById<ImageButton>(R.id.btnLeft)
+        val btnRight = findViewById<ImageButton>(R.id.btnRight)
+
+        gameView.onSceneChangeListener = { isInGame ->
+            val visibilityState = if (isInGame) View.VISIBLE else View.GONE
+
+            btnUp.visibility = visibilityState
+            btnDown.visibility = visibilityState
+            btnLeft.visibility = visibilityState
+            btnRight.visibility = visibilityState
+        }
+
+        btnUp.setOnClickListener {
             gameView.moveUp()
         }
 
-        findViewById<ImageButton>(R.id.btnDown).setOnClickListener {
+        btnDown.setOnClickListener {
             gameView.moveDown()
         }
 
-        findViewById<ImageButton>(R.id.btnLeft).setOnClickListener {
+        btnLeft.setOnClickListener {
             gameView.moveLeft()
         }
 
-        findViewById<ImageButton>(R.id.btnRight).setOnClickListener {
+        btnRight.setOnClickListener {
             gameView.moveRight()
         }
     }
