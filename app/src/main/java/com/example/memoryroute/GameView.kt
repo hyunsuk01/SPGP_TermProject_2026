@@ -12,7 +12,7 @@ class GameView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
-    private enum class Scene { START, ROUND_SELECT, GAME, PAUSE }
+    private enum class Scene { START, ROUND_SELECT, GAME, PAUSE, CLEAR }
 
     var onSceneChangeListener: ((Boolean) -> Unit)? = null
 
@@ -34,6 +34,7 @@ class GameView @JvmOverloads constructor(
     private val round1BtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.one)
     private val round2BtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.two)
     private val round3BtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.three)
+    private val round4BtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.four)
 
     private val exitBtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.exit_button)
     private val restartBtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.restart_button)
@@ -41,17 +42,20 @@ class GameView @JvmOverloads constructor(
     private val pauseHeaderBitmap = BitmapFactory.decodeResource(resources, R.drawable.pause)
     private val resumeBtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.resume)
     private val pauseExitBtnBitmap = BitmapFactory.decodeResource(resources, R.drawable.exit)
+    private val clearBitmap = BitmapFactory.decodeResource(resources, R.drawable.clear)
 
     private val startGameBtnRect = RectF()
     private val quitGameBtnRect = RectF()
     private val round1BtnRect = RectF()
     private val round2BtnRect = RectF()
     private val round3BtnRect = RectF()
+    private val round4BtnRect = RectF()
     private val roundSelectExitBtnRect = RectF()
     private val inGameRestartBtnRect = RectF()
     private val inGamePauseBtnRect = RectF()
     private val pauseExitBtnRect = RectF()
     private val pauseResumeBtnRect = RectF()
+    private var clearStartTime = 0L
 
     private var stageIndex = 0
     private var mapCols = 6
@@ -61,6 +65,7 @@ class GameView @JvmOverloads constructor(
     private val background1 = BitmapFactory.decodeResource(resources, R.drawable.city1)
     private val background2 = BitmapFactory.decodeResource(resources, R.drawable.city2)
     private val background3 = BitmapFactory.decodeResource(resources, R.drawable.city3)
+    private val background4 = BitmapFactory.decodeResource(resources, R.drawable.city3)
 
     private val idleBitmap = BitmapFactory.decodeResource(resources, R.drawable.idle)
     private val runBitmap = BitmapFactory.decodeResource(resources, R.drawable.run)
@@ -129,6 +134,7 @@ class GameView @JvmOverloads constructor(
             0 -> { mapCols = 6; mapRows = 4; moveLimit = 4; visualFloorOffset = -100f }
             1 -> { mapCols = 5; mapRows = 4; moveLimit = 5; visualFloorOffset = -100f }
             2 -> { mapCols = 6; mapRows = 4; moveLimit = 5; visualFloorOffset = -100f }
+            3 -> { mapCols = 6; mapRows = 4; moveLimit = 7; visualFloorOffset = -100f }
         }
         tileSizeX = (width * 0.75f) / mapCols
         resetPosition()
@@ -139,6 +145,10 @@ class GameView @JvmOverloads constructor(
             0 -> { playerX = startX; playerY = startY }
             1 -> { playerX = startX + (2 * tileSizeX); playerY = startY + (0 * tileSizeY) }
             2 -> { playerX = startX; playerY = startY }
+            3 -> {
+                playerX = startX + (2 * tileSizeX)
+                playerY = startY + (0 * tileSizeY)
+            }
         }
         targetX = playerX; targetY = playerY
         shadowX = playerX; shadowY = playerY
@@ -163,6 +173,14 @@ class GameView @JvmOverloads constructor(
             Scene.PAUSE -> {
                 drawInGameScene(canvas)
                 drawPauseOverlay(canvas)
+            }
+            Scene.CLEAR -> {
+                drawInGameScene(canvas)
+                drawClearOverlay(canvas)
+
+                if (System.currentTimeMillis() - clearStartTime > 1000L) {
+                    currentScene = Scene.ROUND_SELECT
+                }
             }
         }
 
@@ -192,7 +210,7 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun drawRoundSelectOverlay(canvas: Canvas) {
-        val marginX = width * 0.1f; val marginY = height * 0.2f
+        val marginX = width * 0.05f; val marginY = height * 0.15f
         val rect = RectF(marginX, marginY, width - marginX, height - marginY)
 
         uiPaint.color = Color.argb(220, 255, 255, 255)
@@ -206,25 +224,30 @@ class GameView @JvmOverloads constructor(
 
         val roundW = 450f; val roundH = 120f
         val roundLeft = (width - roundW) / 2f
-        val roundTop = marginY + 80f
+        val roundTop = marginY + 50f
         val roundRect = RectF(roundLeft, roundTop, roundLeft + roundW, roundTop + roundH)
         canvas.drawBitmap(roundHeaderBitmap, null, roundRect, paint)
 
-        val bSize = 160f
-        val rTop = marginY + 320f
+        val bSize = 140f
+        val rTop = marginY + 280f
         val centerX = width / 2f
+        val gap = 30f
 
-        val r1Left = centerX - (bSize * 1.5f) - 60f
+        val r1Left = centerX - (bSize * 2f) - (gap * 1.5f)
         round1BtnRect.set(r1Left, rTop, r1Left + bSize, rTop + bSize)
         canvas.drawBitmap(round1BtnBitmap, null, round1BtnRect, paint)
 
-        val r2Left = centerX - (bSize / 2f)
+        val r2Left = centerX - bSize - (gap * 0.5f)
         round2BtnRect.set(r2Left, rTop, r2Left + bSize, rTop + bSize)
         canvas.drawBitmap(round2BtnBitmap, null, round2BtnRect, paint)
 
-        val r3Left = centerX + (bSize / 2f) + 60f
+        val r3Left = centerX + (gap * 0.5f)
         round3BtnRect.set(r3Left, rTop, r3Left + bSize, rTop + bSize)
         canvas.drawBitmap(round3BtnBitmap, null, round3BtnRect, paint)
+
+        val r4Left = centerX + bSize + (gap * 1.5f)
+        round4BtnRect.set(r4Left, rTop, r4Left + bSize, rTop + bSize)
+        canvas.drawBitmap(round4BtnBitmap, null, round4BtnRect, paint)
     }
 
     private fun drawInGameScene(canvas: Canvas) {
@@ -289,6 +312,18 @@ class GameView @JvmOverloads constructor(
         canvas.drawBitmap(resumeBtnBitmap, null, pauseResumeBtnRect, paint)
     }
 
+    private fun drawClearOverlay(canvas: Canvas) {
+        uiPaint.color = Color.argb(200, 255, 255, 255)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), uiPaint)
+
+        val imgWidth = width * 0.6f
+        val scale = imgWidth / clearBitmap.width
+        val imgHeight = clearBitmap.height * scale
+        val dst = RectF((width - imgWidth) / 2f, (height - imgHeight) / 2f,
+            (width + imgWidth) / 2f, (height + imgHeight) / 2f)
+        canvas.drawBitmap(clearBitmap, null, dst, paint)
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN) {
             val tx = event.x
@@ -319,6 +354,9 @@ class GameView @JvmOverloads constructor(
                     if (round3BtnRect.contains(tx, ty)) {
                         stageIndex = 2; startSelectedStage(); return true
                     }
+                    if (round4BtnRect.contains(tx, ty)) {
+                        stageIndex = 3; startSelectedStage(); return true
+                    }
                 }
                 Scene.GAME -> {
                     if (inGameRestartBtnRect.contains(tx, ty)) {
@@ -340,6 +378,10 @@ class GameView @JvmOverloads constructor(
                         return true
                     }
                 }
+                Scene.CLEAR -> {
+                    currentScene = Scene.ROUND_SELECT
+                    return true
+                }
             }
         }
         return super.onTouchEvent(event)
@@ -355,7 +397,8 @@ class GameView @JvmOverloads constructor(
         val bgBitmap = when (stageIndex) {
             0 -> background1
             1 -> background2
-            else -> background3
+            2 -> background3
+            else -> background4
         }
         val scale = width.toFloat() / bgBitmap.width
         val scaledHeight = (bgBitmap.height * scale).toInt()
@@ -439,7 +482,7 @@ class GameView @JvmOverloads constructor(
                     canvas.drawBitmap(ladderBitmap, null, ladderDst, paint)
                 }
             }
-        } else {
+        } else if (stageIndex == 2) {
             for (i in 0 until 24) {
                 val col = i % mapCols; val row = i / mapCols
                 val x = startX + col * tileSizeX; val y = startY + row * tileSizeY
@@ -498,6 +541,67 @@ class GameView @JvmOverloads constructor(
                     }
                 }
             }
+        } else if (stageIndex == 3) {
+            for (i in 0 until 24) {
+                val col = i % mapCols; val row = i / mapCols
+                val x = startX + col * tileSizeX; val y = startY + row * tileSizeY
+                val floorHeight = tileSizeY * 0.5f
+                val floorTop = y + (tileSizeY - floorHeight) + visualFloorOffset * 2.5f
+                val floorDst = RectF(x, floorTop, x + tileSizeX, floorTop + floorHeight)
+
+                val tileNum = i + 1
+
+                when (tileNum) {
+                    1, 2, 3, 4, 7, 8, 11, 13, 14, 16, 19, 20, 21, 22, 24 -> {
+                        canvas.drawBitmap(floorBitmap, null, floorDst, paint)
+                    }
+                    15, 18 -> {
+                        val bFloor = if (isSwitchPressed) buttonFloorBitmap else buttonFloor1Bitmap
+                        canvas.drawBitmap(bFloor, null, floorDst, paint)
+                    }
+                }
+
+                val objectFloorTop = floorTop - tileSizeY
+
+                when (tileNum) {
+                    1, 21 -> {
+                        val bWidth = buttonBitmap.width / 4
+                        val bSrc = Rect(buttonFrame * bWidth, 0, (buttonFrame + 1) * bWidth, buttonBitmap.height)
+                        val btnW = tileSizeX * 0.4f; val btnH = tileSizeY * 0.4f
+                        val btnDst = RectF(x + (tileSizeX - btnW) / 2f, floorTop - btnH, x + (tileSizeX + btnW) / 2f, floorTop)
+                        canvas.drawBitmap(buttonBitmap, bSrc, btnDst, paint)
+                    }
+                    2, 16 -> {
+                        val pSingleW = greenPortalBitmap.width / 8
+                        val pSingleH = greenPortalBitmap.height / 3
+                        val srcX = (portalFrame % 8) * pSingleW
+                        val srcY = (portalFrame / 8) * pSingleH
+                        val pSrc = Rect(srcX, srcY, srcX + pSingleW, srcY + pSingleH)
+                        val pW = tileSizeX * 0.8f; val pH = tileSizeY * 1.2f
+                        val pDst = RectF(x + (tileSizeX - pW) / 2f, floorTop - pH, x + (tileSizeX + pW) / 2f, floorTop)
+                        canvas.drawBitmap(greenPortalBitmap, pSrc, pDst, paint)
+                    }
+                    8 -> {
+                        val bWidth = portalButtonBitmap.width / 4
+                        val bSrc = Rect(portalButtonFrame * bWidth, 0, (portalButtonFrame + 1) * bWidth, portalButtonBitmap.height)
+                        val btnW = tileSizeX * 0.4f; val btnH = tileSizeY * 0.4f
+                        val btnDst = RectF(x + (tileSizeX - btnW) / 2f, floorTop - btnH, x + (tileSizeX + btnW) / 2f, floorTop)
+                        canvas.drawBitmap(portalButtonBitmap, bSrc, btnDst, paint)
+                    }
+                    24 -> {
+                        val fWidth = flagBitmap.width / 9
+                        val fSrc = Rect(flagFrame * fWidth, 0, (flagFrame + 1) * fWidth, flagBitmap.height)
+                        val flagH = tileSizeY * 0.6f
+                        val flagDst = RectF(x, floorTop - flagH, x + tileSizeX, floorTop)
+                        canvas.drawBitmap(flagBitmap, fSrc, flagDst, paint)
+                    }
+                    7 -> {
+                        val ladderW = tileSizeX * 0.4f
+                        val ladderDst = RectF(x + (tileSizeX - ladderW) / 2f, floorTop, x + (tileSizeX + ladderW) / 2f, floorTop + tileSizeY)
+                        canvas.drawBitmap(ladderBitmap, null, ladderDst, paint)
+                    }
+                }
+            }
         }
     }
 
@@ -518,8 +622,15 @@ class GameView @JvmOverloads constructor(
         val src = Rect(frame * frameWidth, 0, (frame + 1) * frameWidth, bitmap.height)
         val drawX = x + (tileSizeX - characterSize) / 2f
         val floorHeight = tileSizeY * 0.5f
-        val characterFloorTop = if (stageIndex == 0 || stageIndex == 2) y + (tileSizeY - floorHeight) + visualFloorOffset
-        else y + (tileSizeY - floorHeight) + visualFloorOffset * 0.5f
+
+        val characterFloorTop = when (stageIndex) {
+            0 -> y + (tileSizeY - floorHeight) + visualFloorOffset
+            1 -> y + (tileSizeY - floorHeight) + visualFloorOffset * 0.5f
+            2 -> y + (tileSizeY - floorHeight) + visualFloorOffset
+            3 -> y + (tileSizeY - floorHeight) + visualFloorOffset * 2.5f
+            else -> y + (tileSizeY - floorHeight) + visualFloorOffset
+        }
+
         val dst = RectF(drawX, characterFloorTop - characterSize, drawX + characterSize, characterFloorTop)
 
         if (isRight || curState == State.CLIMB) {
@@ -536,13 +647,22 @@ class GameView @JvmOverloads constructor(
         val speed = tileSizeX / 10f
         playerX = moveToward(playerX, targetX, speed)
 
-        if (stageIndex == 1 && state == State.IDLE && playerY != targetY) {
+        if ((stageIndex == 1 || stageIndex == 3) && state == State.IDLE && playerY != targetY) {
             val pIdx = getCurrentIndex(playerX, playerY) + 1
-            val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
-            val isButtonFloorValid = pIdx == 4 || pIdx == 11
-            if (permanentTiles.contains(pIdx) || isButtonFloorValid) {
-                targetY = startY + (Math.round((playerY - startY) / tileSizeY) * tileSizeY)
-                playerY = targetY; isMoving = false; checkTileEffect(); return
+            if (stageIndex == 1) {
+                val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
+                val isButtonFloorValid = (pIdx == 4 || pIdx == 11) && !isSwitchPressed
+                if (permanentTiles.contains(pIdx) || isButtonFloorValid) {
+                    targetY = startY + (Math.round((playerY - startY) / tileSizeY) * tileSizeY)
+                    playerY = targetY; isMoving = false; checkTileEffect(); return
+                }
+            } else if (stageIndex == 3) {
+                val permanentTiles = listOf(1, 2, 3, 4, 7, 8, 11, 13, 14, 16, 19, 20, 21, 22, 24)
+                val isButtonFloorValid = (pIdx == 15 || pIdx == 18) && !isSwitchPressed
+                if (permanentTiles.contains(pIdx) || isButtonFloorValid) {
+                    targetY = startY + (Math.round((playerY - startY) / tileSizeY) * tileSizeY)
+                    playerY = targetY; isMoving = false; checkTileEffect(); return
+                }
             }
         }
         playerY = moveToward(playerY, targetY, speed)
@@ -560,13 +680,22 @@ class GameView @JvmOverloads constructor(
         val speed = tileSizeX / 10f
         shadowX = moveToward(shadowX, shadowTargetX, speed)
 
-        if (stageIndex == 1 && shadowState == State.IDLE && shadowY != shadowTargetY) {
+        if ((stageIndex == 1 || stageIndex == 3) && shadowState == State.IDLE && shadowY != shadowTargetY) {
             val sIdx = getCurrentIndex(shadowX, shadowY) + 1
-            val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
-            val isButtonFloorValid = sIdx == 4 || sIdx == 11
-            if (permanentTiles.contains(sIdx) || isButtonFloorValid) {
-                shadowTargetY = startY + (Math.round((shadowY - startY) / tileSizeY) * tileSizeY)
-                shadowY = shadowTargetY; shadowMoving = false; checkTileEffect(); return
+            if (stageIndex == 1) {
+                val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
+                val isButtonFloorValid = (sIdx == 4 || sIdx == 11) && !isSwitchPressed
+                if (permanentTiles.contains(sIdx) || isButtonFloorValid) {
+                    shadowTargetY = startY + (Math.round((shadowY - startY) / tileSizeY) * tileSizeY)
+                    shadowY = shadowTargetY; shadowMoving = false; checkTileEffect(); return
+                }
+            } else if (stageIndex == 3) {
+                val permanentTiles = listOf(1, 2, 3, 4, 7, 8, 11, 13, 14, 16, 19, 20, 21, 22, 24)
+                val isButtonFloorValid = (sIdx == 15 || sIdx == 18) && !isSwitchPressed
+                if (permanentTiles.contains(sIdx) || isButtonFloorValid) {
+                    shadowTargetY = startY + (Math.round((shadowY - startY) / tileSizeY) * tileSizeY)
+                    shadowY = shadowTargetY; shadowMoving = false; checkTileEffect(); return
+                }
             }
         }
         shadowY = moveToward(shadowY, shadowTargetY, speed)
@@ -597,9 +726,7 @@ class GameView @JvmOverloads constructor(
             if (isPortalButtonPressed) { if (portalButtonFrame < 3) portalButtonFrame++ } else { if (portalButtonFrame > 0) portalButtonFrame-- }
 
             when (currentPortalState) {
-                PortalState.IDLE -> {
-                    portalFrame = (portalFrame + 1) % 8
-                }
+                PortalState.IDLE -> { portalFrame = (portalFrame + 1) % 8 }
                 PortalState.TELEPORT -> {
                     if (portalFrame < 16 || portalFrame > 19) portalFrame = 16
                     else if (portalFrame < 19) portalFrame++
@@ -647,6 +774,7 @@ class GameView @JvmOverloads constructor(
                 0 -> { shadowX = startX; shadowY = startY }
                 1 -> { shadowX = startX + (2 * tileSizeX); shadowY = startY + (0 * tileSizeY) }
                 2 -> { shadowX = startX; shadowY = startY }
+                3 -> { shadowX = startX + (2 * tileSizeX); shadowY = startY + (0 * tileSizeY) }
             }
             shadowTargetX = shadowX; shadowTargetY = shadowY
         }
@@ -664,12 +792,14 @@ class GameView @JvmOverloads constructor(
                 if (stageIndex == 0 && idx == 14) { shadowTargetY -= tileSizeY * 2; shadowState = State.CLIMB }
                 else if (stageIndex == 1 && idx == 12) { shadowTargetY -= tileSizeY; shadowState = State.CLIMB }
                 else if (stageIndex == 2 && idx == 14) { shadowTargetY -= tileSizeY * 2; shadowState = State.CLIMB }
+                else if (stageIndex == 3 && idx == 13) { shadowTargetY -= tileSizeY; shadowState = State.CLIMB }
             }
             Direction.DOWN -> {
                 val idx = getCurrentIndex(shadowX, shadowY) + 1
                 if (stageIndex == 0 && idx == 2) { shadowTargetY += tileSizeY * 2; shadowState = State.CLIMB }
                 else if (stageIndex == 1 && idx == 7) { shadowTargetY += tileSizeY; shadowState = State.CLIMB }
                 else if (stageIndex == 2 && idx == 2) { shadowTargetY += tileSizeY * 2; shadowState = State.CLIMB }
+                else if (stageIndex == 3 && idx == 7) { shadowTargetY += tileSizeY; shadowState = State.CLIMB }
             }
         }
         shadowMoving = true; shadowFrame = 0; replayIndex++
@@ -740,14 +870,17 @@ class GameView @JvmOverloads constructor(
                 val rowS = Math.round((shadowY - startY) / tileSizeY).toInt()
                 shadowTargetY = startY + ((rowS + 1) * tileSizeY); shadowMoving = true; shadowState = State.RUN
             }
-            if (pIdx == 6) { currentScene = Scene.ROUND_SELECT }
+            if (pIdx == 6) {
+                currentScene = Scene.CLEAR
+                clearStartTime = System.currentTimeMillis()
+            }
             return
         }
 
         if (stageIndex == 1) {
             isSwitchPressed = (pIdx == 12 || sIdx == 12)
             val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
-            val isPlayerOnValidTile = permanentTiles.contains(pIdx) || (pIdx == 4 || pIdx == 11)
+            val isPlayerOnValidTile = permanentTiles.contains(pIdx) || ((pIdx == 4 || pIdx == 11) && !isSwitchPressed)
 
             if (pIdx == -1 || !isPlayerOnValidTile) {
                 val currentCol = Math.round((playerX - startX) / tileSizeX).toInt()
@@ -756,11 +889,11 @@ class GameView @JvmOverloads constructor(
 
                 for (nextRow in (currentRow + 1) until mapRows) {
                     val checkIdx = (nextRow * mapCols + currentCol) + 1
-                    val isValidLanding = permanentTiles.contains(checkIdx) || (checkIdx == 4 || checkIdx == 11)
+                    val isValidLanding = permanentTiles.contains(checkIdx) || ((checkIdx == 4 || checkIdx == 11) && !isSwitchPressed)
                     if (isValidLanding) { foundLandingRow = nextRow; isFatalFall = false; break }
                 }
                 if (!isFatalFall && foundLandingRow != -1) {
-                    playerX = startX + (currentCol * tileSizeX); targetY += (tileSizeY * (foundLandingRow - currentRow))
+                    playerX = startX + (currentCol * tileSizeX); targetY = startY + (foundLandingRow * tileSizeY)
                     isMoving = true; state = State.IDLE
                 } else {
                     targetY = height.toFloat() + characterSize; isMoving = true; state = State.RUN
@@ -768,7 +901,7 @@ class GameView @JvmOverloads constructor(
             }
 
             if (shadowVisible) {
-                val isShadowOnValidTile = permanentTiles.contains(sIdx) || (sIdx == 4 || sIdx == 11)
+                val isShadowOnValidTile = permanentTiles.contains(sIdx) || ((sIdx == 4 || sIdx == 11) && !isSwitchPressed)
                 if (sIdx == -1 || !isShadowOnValidTile) {
                     val currentColS = Math.round((shadowX - startX) / tileSizeX).toInt()
                     val currentRowS = Math.round((shadowY - startY) / tileSizeY).toInt()
@@ -776,18 +909,21 @@ class GameView @JvmOverloads constructor(
 
                     for (nextRowS in (currentRowS + 1) until mapRows) {
                         val checkIdxS = (nextRowS * mapCols + currentColS) + 1
-                        val isValidLandingS = permanentTiles.contains(checkIdxS) || (checkIdxS == 4 || checkIdxS == 11)
+                        val isValidLandingS = permanentTiles.contains(checkIdxS) || ((checkIdxS == 4 || checkIdxS == 11) && !isSwitchPressed)
                         if (isValidLandingS) { foundLandingRowS = nextRowS; isFatalFallS = false; break }
                     }
                     if (!isFatalFallS && foundLandingRowS != -1) {
-                        shadowX = startX + (currentColS * tileSizeX); shadowTargetY += (tileSizeY * (foundLandingRowS - currentRowS))
+                        shadowX = startX + (currentColS * tileSizeX); shadowTargetY = startY + (foundLandingRowS * tileSizeY)
                         shadowMoving = true; shadowState = State.IDLE
                     } else {
                         shadowTargetY = height.toFloat() + characterSize; shadowMoving = true; shadowState = State.RUN
                     }
                 }
             }
-            if (pIdx == 16) { currentScene = Scene.ROUND_SELECT }
+            if (pIdx == 16) {
+                currentScene = Scene.CLEAR
+                clearStartTime = System.currentTimeMillis()
+            }
             return
         }
 
@@ -846,7 +982,99 @@ class GameView @JvmOverloads constructor(
                 val rowS = Math.round((shadowY - startY) / tileSizeY).toInt()
                 shadowTargetY = startY + ((rowS + 1) * tileSizeY); shadowMoving = true; shadowState = State.RUN
             }
-            if (pIdx == 6) { currentScene = Scene.ROUND_SELECT }
+            if (pIdx == 6) {
+                currentScene = Scene.CLEAR
+                clearStartTime = System.currentTimeMillis()
+            }
+            return
+        }
+
+        if (stageIndex == 3) {
+            isSwitchPressed = (pIdx == 1 || pIdx == 21 || sIdx == 1 || sIdx == 21)
+
+            val buttonActive = (pIdx == 8 || sIdx == 8)
+            isPortalButtonPressed = buttonActive
+
+            if (buttonActive) {
+                if (currentPortalState != PortalState.IDLE) {
+                    currentPortalState = PortalState.IDLE
+                    portalFrame = 0
+                }
+            }
+
+            val pos2X = startX + (1 * tileSizeX);  val pos2Y = startY + (0 * tileSizeY)
+            val pos16X = startX + (3 * tileSizeX); val pos16Y = startY + (2 * tileSizeY)
+
+            if (currentPortalState == PortalState.IDLE) {
+                if (pIdx == 2) {
+                    playerX = pos16X; playerY = pos16Y
+                    targetX = pos16X; targetY = pos16Y
+                    currentPortalState = PortalState.TELEPORT
+                } else if (pIdx == 16) {
+                    playerX = pos2X; playerY = pos2Y
+                    targetX = pos2X; targetY = pos2Y
+                    currentPortalState = PortalState.TELEPORT
+                }
+
+                if (shadowVisible) {
+                    if (sIdx == 2) {
+                        shadowX = pos16X; shadowY = pos16Y
+                        shadowTargetX = pos16X; shadowTargetY = pos16Y
+                        currentPortalState = PortalState.TELEPORT
+                    } else if (sIdx == 16) {
+                        shadowX = pos2X; shadowY = pos2Y
+                        shadowTargetX = pos2X; shadowTargetY = pos2Y
+                        currentPortalState = PortalState.TELEPORT
+                    }
+                }
+            }
+
+            val permanentTiles = listOf(1, 2, 3, 4, 7, 8, 11, 13, 14, 16, 19, 20, 21, 22, 24)
+            val isPlayerOnValidTile = permanentTiles.contains(pIdx) || ((pIdx == 15 || pIdx == 18) && !isSwitchPressed)
+
+            if (pIdx == -1 || !isPlayerOnValidTile) {
+                val currentCol = Math.round((playerX - startX) / tileSizeX).toInt()
+                val currentRow = Math.round((playerY - startY) / tileSizeY).toInt()
+                var foundLandingRow = -1; var isFatalFall = true
+
+                for (nextRow in (currentRow + 1) until mapRows) {
+                    val checkIdx = (nextRow * mapCols + currentCol) + 1
+                    val isValidLanding = permanentTiles.contains(checkIdx) || ((checkIdx == 15 || checkIdx == 18) && !isSwitchPressed)
+                    if (isValidLanding) { foundLandingRow = nextRow; isFatalFall = false; break }
+                }
+                if (!isFatalFall && foundLandingRow != -1) {
+                    playerX = startX + (currentCol * tileSizeX); targetY = startY + (foundLandingRow * tileSizeY)
+                    isMoving = true; state = State.IDLE
+                } else {
+                    targetY = height.toFloat() + characterSize; isMoving = true; state = State.RUN
+                }
+            }
+
+            if (shadowVisible) {
+                val isShadowOnValidTile = permanentTiles.contains(sIdx) || ((sIdx == 15 || sIdx == 18) && !isSwitchPressed)
+                if (sIdx == -1 || !isShadowOnValidTile) {
+                    val currentColS = Math.round((shadowX - startX) / tileSizeX).toInt()
+                    val currentRowS = Math.round((shadowY - startY) / tileSizeY).toInt()
+                    var foundLandingRowS = -1; var isFatalFallS = true
+
+                    for (nextRowS in (currentRowS + 1) until mapRows) {
+                        val checkIdxS = (nextRowS * mapCols + currentColS) + 1
+                        val isValidLandingS = permanentTiles.contains(checkIdxS) || ((checkIdxS == 15 || checkIdxS == 18) && !isSwitchPressed)
+                        if (isValidLandingS) { foundLandingRowS = nextRowS; isFatalFallS = false; break }
+                    }
+                    if (!isFatalFallS && foundLandingRowS != -1) {
+                        shadowX = startX + (currentColS * tileSizeX); shadowTargetY = startY + (foundLandingRowS * tileSizeY)
+                        shadowMoving = true; shadowState = State.IDLE
+                    } else {
+                        shadowTargetY = height.toFloat() + characterSize; shadowMoving = true; shadowState = State.RUN
+                    }
+                }
+            }
+
+            if (pIdx == 24) {
+                currentScene = Scene.CLEAR
+                clearStartTime = System.currentTimeMillis()
+            }
         }
     }
 
@@ -869,6 +1097,8 @@ class GameView @JvmOverloads constructor(
             recordMove(Direction.UP); targetY -= tileSizeY; state = State.CLIMB; startMove()
         } else if (stageIndex == 2 && idx == 14) {
             recordMove(Direction.UP); targetY -= tileSizeY * 2; state = State.CLIMB; startMove()
+        } else if (stageIndex == 3 && idx == 13) {
+            recordMove(Direction.UP); targetY -= tileSizeY; state = State.CLIMB; startMove()
         }
     }
 
@@ -881,6 +1111,8 @@ class GameView @JvmOverloads constructor(
             recordMove(Direction.DOWN); targetY += tileSizeY; state = State.CLIMB; startMove()
         } else if (stageIndex == 2 && idx == 2) {
             recordMove(Direction.DOWN); targetY += tileSizeY * 2; state = State.CLIMB; startMove()
+        } else if (stageIndex == 3 && idx == 7) {
+            recordMove(Direction.DOWN); targetY += tileSizeY; state = State.CLIMB; startMove()
         }
     }
 
