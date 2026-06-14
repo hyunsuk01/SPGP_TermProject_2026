@@ -3,6 +3,9 @@ package com.example.memoryroute
 import android.app.Activity
 import android.content.Context
 import android.graphics.*
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.SoundPool
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -11,6 +14,9 @@ class GameView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
+    private var bgmPlayer: MediaPlayer? = null
+    private var soundPool: SoundPool? = null
+    private val soundMap = mutableMapOf<String, Int>()
 
     private enum class Scene { START, ROUND_SELECT, GAME, PAUSE, CLEAR }
 
@@ -118,10 +124,42 @@ class GameView @JvmOverloads constructor(
     private val moveHistory = mutableListOf<Direction>()
     private var replayIndex = 0
     private var isDead = false
+    private var isCollisionEnabled = false
     private var deathStartTime = 0L
     private var isSwitchPressed = false
     private var isPortalButtonPressed = false
     private var currentPortalState = PortalState.IDLE
+
+    init {
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_GAME)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        soundPool = SoundPool.Builder().setMaxStreams(5).setAudioAttributes(audioAttributes).build()
+
+        soundMap["die"] = soundPool!!.load(context, R.raw.die, 1)
+        soundMap["portal"] = soundPool!!.load(context, R.raw.portal, 1)
+        soundMap["button"] = soundPool!!.load(context, R.raw.button, 1)
+        soundMap["clear"] = soundPool!!.load(context, R.raw.clear, 1)
+        soundMap["shadow"] = soundPool!!.load(context, R.raw.shadow, 1)
+
+        bgmPlayer = MediaPlayer.create(context, R.raw.bgm).apply {
+            isLooping = true
+            start()
+        }
+    }
+
+    private fun playSound(key: String) {
+        soundMap[key]?.let { soundPool?.play(it, 1f, 1f, 1, 0, 1f) }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        bgmPlayer?.release()
+        bgmPlayer = null
+        soundPool?.release()
+        soundPool = null
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -747,7 +785,9 @@ class GameView @JvmOverloads constructor(
 
     private fun drawMoveSlots(canvas: Canvas) {
         val slotSize = 120f; val totalWidth = moveLimit * slotSize
-        val startXPos = (width - totalWidth) / 2f; val y = 40f
+        val startXPos = (width - totalWidth) / 2f
+
+        val y = if (stageIndex == 3) height.toFloat() - 200f else 40f
 
         for (i in 0 until moveLimit) {
             val left = startXPos + i * slotSize
@@ -812,8 +852,16 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun checkCollision() {
-        if (!shadowVisible || isDead) return
-        if (Math.abs(playerX - shadowX) < tileSizeX * 0.4f && Math.abs(playerY - shadowY) < tileSizeY * 0.4f) startDeath()
+        if (isDead || !isCollisionEnabled) return
+
+        val pCol = Math.round((playerX - startX) / tileSizeX).toInt()
+        val pRow = Math.round((playerY - startY) / tileSizeY).toInt()
+        if (pCol == 0 && pRow == 0) return
+
+        if (shadowVisible && Math.abs(playerX - shadowX) < tileSizeX * 0.4f && Math.abs(playerY - shadowY) < tileSizeY * 0.4f) {
+            playSound("die")
+            startDeath()
+        }
     }
 
     private fun startDeath() {
@@ -828,6 +876,9 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun resetStage() {
+        isDead = false
+        isCollisionEnabled = false
+        postDelayed({ isCollisionEnabled = true }, 500)
         resetPosition()
         moveHistory.clear(); replayIndex = 0
         shadowVisible = false; shadowReady = false; isMoving = false; shadowMoving = false
@@ -864,13 +915,16 @@ class GameView @JvmOverloads constructor(
                 }
             }
             if ((pIdx == 5 || pIdx == 11) && !isSwitchPressed) {
+                playSound("button")
                 targetY = startY + ((rowP + 1) * tileSizeY); isMoving = true; state = State.RUN
             }
             if (shadowVisible && (sIdx == 5 || sIdx == 11) && !isSwitchPressed) {
+                playSound("button")
                 val rowS = Math.round((shadowY - startY) / tileSizeY).toInt()
                 shadowTargetY = startY + ((rowS + 1) * tileSizeY); shadowMoving = true; shadowState = State.RUN
             }
             if (pIdx == 6) {
+                playSound("clear")
                 currentScene = Scene.CLEAR
                 clearStartTime = System.currentTimeMillis()
             }
@@ -878,7 +932,11 @@ class GameView @JvmOverloads constructor(
         }
 
         if (stageIndex == 1) {
+            val wasSwitchPressed = isSwitchPressed
             isSwitchPressed = (pIdx == 12 || sIdx == 12)
+            if ((pIdx == 12 || sIdx == 12) && !wasSwitchPressed) {
+                playSound("button")
+            }
             val permanentTiles = listOf(3, 5, 7, 10, 12, 13, 14, 15, 16)
             val isPlayerOnValidTile = permanentTiles.contains(pIdx) || ((pIdx == 4 || pIdx == 11) && !isSwitchPressed)
 
@@ -921,6 +979,7 @@ class GameView @JvmOverloads constructor(
                 }
             }
             if (pIdx == 16) {
+                playSound("clear")
                 currentScene = Scene.CLEAR
                 clearStartTime = System.currentTimeMillis()
             }
@@ -928,10 +987,18 @@ class GameView @JvmOverloads constructor(
         }
 
         if (stageIndex == 2) {
+            val wasSwitchPressed = isSwitchPressed
             isSwitchPressed = (pIdx == 17 || sIdx == 17)
+            if (isSwitchPressed && !wasSwitchPressed) {
+                playSound("button")
+            }
 
             val wasPressed = isPortalButtonPressed
             isPortalButtonPressed = (pIdx == 16 || sIdx == 16)
+            if (isPortalButtonPressed && !wasPressed) {
+                playSound("button")
+            }
+
             if (isPortalButtonPressed && !wasPressed && currentPortalState == PortalState.TELEPORT) {
                 currentPortalState = PortalState.TELEPORT_REVERSE
             }
@@ -941,10 +1008,12 @@ class GameView @JvmOverloads constructor(
 
             if (currentPortalState == PortalState.IDLE) {
                 if (pIdx == 3) {
+                    playSound("portal")
                     playerX = pos18X; playerY = pos18Y
                     targetX = pos18X; targetY = pos18Y
                     currentPortalState = PortalState.TELEPORT
                 } else if (pIdx == 18) {
+                    playSound("portal")
                     playerX = pos3X; playerY = pos3Y
                     targetX = pos3X; targetY = pos3Y
                     currentPortalState = PortalState.TELEPORT
@@ -953,10 +1022,12 @@ class GameView @JvmOverloads constructor(
 
             if (shadowVisible && currentPortalState == PortalState.IDLE) {
                 if (sIdx == 3) {
+                    playSound("portal")
                     shadowX = pos18X; shadowY = pos18Y
                     shadowTargetX = pos18X; shadowTargetY = pos18Y
                     currentPortalState = PortalState.TELEPORT
                 } else if (sIdx == 18) {
+                    playSound("portal")
                     shadowX = pos3X; shadowY = pos3Y
                     shadowTargetX = pos3X; shadowTargetY = pos3Y
                     currentPortalState = PortalState.TELEPORT
@@ -983,6 +1054,7 @@ class GameView @JvmOverloads constructor(
                 shadowTargetY = startY + ((rowS + 1) * tileSizeY); shadowMoving = true; shadowState = State.RUN
             }
             if (pIdx == 6) {
+                playSound("clear")
                 currentScene = Scene.CLEAR
                 clearStartTime = System.currentTimeMillis()
             }
@@ -990,10 +1062,19 @@ class GameView @JvmOverloads constructor(
         }
 
         if (stageIndex == 3) {
+            val wasSwitchPressed = isSwitchPressed
             isSwitchPressed = (pIdx == 1 || pIdx == 21 || sIdx == 1 || sIdx == 21)
+            if (isSwitchPressed && !wasSwitchPressed) {
+                playSound("button")
+            }
 
+            val wasPortalButtonActive = isPortalButtonPressed
             val buttonActive = (pIdx == 8 || sIdx == 8)
             isPortalButtonPressed = buttonActive
+
+            if (buttonActive && !wasPortalButtonActive) {
+                playSound("button")
+            }
 
             if (buttonActive) {
                 if (currentPortalState != PortalState.IDLE) {
@@ -1007,10 +1088,12 @@ class GameView @JvmOverloads constructor(
 
             if (currentPortalState == PortalState.IDLE) {
                 if (pIdx == 2) {
+                    playSound("portal")
                     playerX = pos16X; playerY = pos16Y
                     targetX = pos16X; targetY = pos16Y
                     currentPortalState = PortalState.TELEPORT
                 } else if (pIdx == 16) {
+                    playSound("portal")
                     playerX = pos2X; playerY = pos2Y
                     targetX = pos2X; targetY = pos2Y
                     currentPortalState = PortalState.TELEPORT
@@ -1018,10 +1101,12 @@ class GameView @JvmOverloads constructor(
 
                 if (shadowVisible) {
                     if (sIdx == 2) {
+                        playSound("portal")
                         shadowX = pos16X; shadowY = pos16Y
                         shadowTargetX = pos16X; shadowTargetY = pos16Y
                         currentPortalState = PortalState.TELEPORT
                     } else if (sIdx == 16) {
+                        playSound("portal")
                         shadowX = pos2X; shadowY = pos2Y
                         shadowTargetX = pos2X; shadowTargetY = pos2Y
                         currentPortalState = PortalState.TELEPORT
@@ -1072,6 +1157,7 @@ class GameView @JvmOverloads constructor(
             }
 
             if (pIdx == 24) {
+                playSound("clear")
                 currentScene = Scene.CLEAR
                 clearStartTime = System.currentTimeMillis()
             }
